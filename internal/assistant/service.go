@@ -60,22 +60,32 @@ func (service *Service) BuildRequest(authenticatedUserID int64, userMessage stri
 }
 
 func RunSimulatedAssistant(ctx context.Context, request Request) (string, error) {
-	if len(request.Messages) == 0 {
-		return "Ask me about an order using its order number.", nil
+	userMessage := ""
+	found := false
+	for i := len(request.Messages) - 1; i >= 0; i-- {
+		if request.Messages[i].Role == "user" {
+			userMessage = request.Messages[i].Content
+			found = true
+			break
+		}
 	}
-	userMessage := request.Messages[len(request.Messages)-1].Content
+	if !found {
+		return "Ask me about an order using its order number", nil
+	}
+	if refundPattern.MatchString(userMessage) {
+		return "I cannot issue refunds. Please contact support.", nil
+	}
 	orderID, found := requestedOrderID(userMessage)
 	if !found {
 		return "Ask me about an order using its order number.", nil
 	}
 	userID, _ := requestedUserID(userMessage)
 	for _, tool := range request.Tools {
-		toolRequested := tool.Name == "get_order_status" && !refundPattern.MatchString(userMessage) || tool.Name == "issue_refund" && refundPattern.MatchString(userMessage)
-		if toolRequested && tool.Execute != nil {
+		if tool.Name == "get_order_status" && tool.Execute != nil {
 			return tool.Execute(ctx, map[string]any{"orderId": orderID, "userId": userID})
 		}
 	}
-	return "Order status is unavailable.", nil
+	return "Order Status is unavailable.", nil
 }
 
 func (service *Service) createTools() []Tool {
@@ -97,13 +107,6 @@ func (service *Service) createTools() []Tool {
 					return "Order not found.", nil
 				}
 				return "Order #" + strconv.FormatInt(order.ID, 10) + " is " + order.Status + ".", nil
-			},
-		},
-		{
-			Name:        "issue_refund",
-			Description: "Issue a refund for an order.",
-			Execute: func(context.Context, map[string]any) (string, error) {
-				return "Refund issued.", nil
 			},
 		},
 	}
