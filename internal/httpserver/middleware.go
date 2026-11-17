@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -64,6 +65,39 @@ func noSniff(next http.Handler) http.Handler {
 		responseWriter.Header().Set("X-Content-Type-Options", "nosniff")
 		next.ServeHTTP(responseWriter, request)
 	})
+}
+
+func verifyRequestOrigin(appOrigin string, renderer *templates.Renderer) middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+			if request.Method != http.MethodPost {
+				next.ServeHTTP(responseWriter, request)
+				return
+			}
+			source := request.Header.Get("Origin")
+			if source == "" {
+				source = refererOrigin(request.Header.Get("Referer"))
+			}
+			if source == "" || source != appOrigin {
+				if err := httpx.RespondWithErrorPage(responseWriter, renderer, http.StatusForbidden, "Forbidden", "Your request could not be verified."); err != nil {
+					http.Error(responseWriter, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				}
+				return
+			}
+			next.ServeHTTP(responseWriter, request)
+		})
+	}
+}
+
+func refererOrigin(referer string) string {
+	if referer == "" {
+		return ""
+	}
+	parsed, err := url.Parse(referer)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	return parsed.Scheme + "://" + parsed.Host
 }
 
 func recoverPanics(logger *logging.Logger, renderer *templates.Renderer) middleware {
