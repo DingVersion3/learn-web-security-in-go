@@ -43,20 +43,28 @@ func cspNonce(next http.Handler) http.Handler {
 	})
 }
 
-func noSniff(next http.Handler) http.Handler {
+func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
-		responseWriter.Header().Set("X-Content-Type-Options", "nosniff")
+		nonce := httpx.CSPNonce(request.Context())
+		header := responseWriter.Header()
+		header.Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'nonce-"+nonce+"'; style-src 'self'; img-src 'self' data:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'")
+		header.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		header.Set("X-Content-Type-Options", "nosniff")
+		header.Set("X-Frame-Options", "SAMEORIGIN")
+		header.Set("Cross-Origin-Opener-Policy", "same-origin")
+		header.Set("Cross-Origin-Resource-Policy", "same-origin")
+		header.Set("Origin-Agent-Cluster", "?1")
+		header.Set("X-DNS-Prefetch-Control", "off")
+		header.Set("X-Download-Options", "noopen")
+		header.Set("X-Permitted-Cross-Domain-Policies", "none")
+		header.Set("X-XSS-Protection", "0")
 		next.ServeHTTP(responseWriter, request)
 	})
 }
 
-func contentSecurityPolicy(next http.Handler) http.Handler {
+func allowCrossOriginResource(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
-		nonce := httpx.CSPNonce(request.Context())
-		policy := "default-src 'self'; script-src 'self' 'nonce-" + nonce + "'; style-src 'self'; img-src 'self' data:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
-		responseWriter.Header().Set("Content-Security-Policy", policy)
-		responseWriter.Header().Set("X-Frame-Options", "SAMEORIGIN")
-		responseWriter.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		responseWriter.Header().Set("Cross-Origin-resource-Policy", "cross-origin")
 		next.ServeHTTP(responseWriter, request)
 	})
 }
