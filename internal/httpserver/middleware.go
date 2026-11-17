@@ -70,8 +70,9 @@ func noSniff(next http.Handler) http.Handler {
 func contentSecurityPolicy(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
 		nonce := httpx.CSPNonce(request.Context())
-		policy := "default-src 'self'; script-src 'self' 'nonce-" + nonce + "'; style-src 'self'; img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+		policy := "default-src 'self'; script-src 'self' 'nonce-" + nonce + "'; style-src 'self'; img-src 'self' data:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
 		responseWriter.Header().Set("Content-Security-Policy", policy)
+		responseWriter.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		next.ServeHTTP(responseWriter, request)
 	})
 }
