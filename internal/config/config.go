@@ -73,13 +73,18 @@ func Parse(environment map[string]string, workingDirectory string) (Config, erro
 		return Config{}, err
 	}
 
+	pawPalAPIKey, err := requiredValue(environment, "PAWPAL_API_KEY")
+	if err != nil {
+		return Config{}, err
+	}
+
 	databasePath := environment["DATABASE_URL"]
 	if databasePath == "" {
 		databasePath = filepath.Join(workingDirectory, "data", defaultDatabaseFilename)
 	}
 
 	return Config{
-		PawPalAPIKey:               "bs_test_pawpal_starter_key",
+		PawPalAPIKey:               pawPalAPIKey,
 		AppOrigin:                  appOrigin,
 		Port:                       port,
 		DatabasePath:               databasePath,
@@ -119,6 +124,14 @@ func valueOrDefault(environment map[string]string, name, fallback string) string
 		return value
 	}
 	return fallback
+}
+
+func requiredValue(environment map[string]string, name string) (string, error) {
+	value := environment[name]
+	if value == "" {
+		return "", fmt.Errorf("missing required environment variable: %s", name)
+	}
+	return value, nil
 }
 
 func parseNonNegativeInteger(value, name string) (int, error) {
